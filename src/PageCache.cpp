@@ -70,6 +70,8 @@ PageCache::deallocSpan(void* addr, std::size_t numPages)
       bool no_free = false;
       if (prev == nextSpan) {
         nextList = nextList->next;
+        if (!nextList)
+          freeSpans_.erase(nextSpan->numPages);
       } else {
         for (; prev->next && prev->next != nextSpan; prev = prev->next);
         if (prev->next == nextSpan)
