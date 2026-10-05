@@ -54,22 +54,29 @@ PageCache::deallocSpan(void* addr, std::size_t numPages)
 {
   std::lock_guard<std::mutex> lock(pglock_);
 
-  auto it = spanMap_.find(addr);
+  auto it = spanMap_.find(addr); // 只管理 spanMap_ 中的内存
   if (it == spanMap_.end())
     return;
   Span* span = it->second;
 
+  // 判断下一页内存是否在 spanMap_ 中有记录
   void* nextAddr = static_cast<char*>(addr) + numPages*PGSIZE;
   auto nextIt = spanMap_.find(nextAddr);
+
   if (nextIt != spanMap_.end()) {
     Span* nextSpan = nextIt->second;
+
+    // 判断下一页内存是否在 freeSpan_ 中（空闲才进行合并）
     auto it2 = freeSpans_.find(nextSpan->numPages);
+
     if (it2 != freeSpans_.end()) {
       auto& nextList = freeSpans_[nextSpan->numPages];
       Span* prev = nextList;
       bool no_free = false;
+
       if (prev == nextSpan) {
         nextList = nextList->next;
+        // 如果移除后链表为空，调用 erase，不要保留 {numPages, nullptr}
         if (!nextList)
           freeSpans_.erase(nextSpan->numPages);
       } else {
@@ -79,6 +86,7 @@ PageCache::deallocSpan(void* addr, std::size_t numPages)
         else
           no_free = true;
       }
+
       if (!no_free) {
         nextSpan->next = nullptr;
         span->numPages += nextSpan->numPages;
